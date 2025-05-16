@@ -164,7 +164,7 @@ async function analyzeError(error: Error, context: AnalysisContext): Promise<Err
     try {
       errorInfo.analysis = await llmProvider.analyze(generatePrompt(error, context));
     } catch (aiError) {
-      console.warn('Analysis failed, falling back to mock provider');
+      console.warn('Analysis failed, falling back to mock provider', aiError);
       errorInfo.analysis = await new providers.mock('').analyze(generatePrompt(error, context));
     }
 
