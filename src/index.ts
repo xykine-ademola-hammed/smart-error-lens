@@ -1,4 +1,6 @@
-import { Configuration, OpenAIApi } from "openai";
+// src/index.ts
+import 'openai/shims/node'; 
+import OpenAI from "openai";
 import "reflect-metadata";
 
 const DEFAULT_MODEL = "gpt-3.5-turbo";
@@ -9,6 +11,7 @@ interface SmartErrorConfig {
   collectStackTrace?: boolean;
   customPrompt?: string;
 }
+
 
 interface ErrorAnalysis {
   error: {
@@ -35,12 +38,14 @@ let globalConfig: SmartErrorConfig = {
   collectStackTrace: true,
 };
 
-let openai: OpenAIApi;
+// Initialize OpenAI
+let openai: OpenAI;
 
+// Configure the package
 export function configure(config: SmartErrorConfig) {
   globalConfig = { ...globalConfig, ...config };
   if (config.apiKey) {
-    openai = new OpenAIApi(new Configuration({ apiKey: config.apiKey }));
+    openai = new OpenAI({ apiKey: config.apiKey });
   }
 }
 
@@ -79,12 +84,15 @@ export function SmartError(options: SmartErrorConfig = {}) {
 
 async function analyzeError(
   error: Error,
-  context: AnalysisContext
-): Promise<ErrorAnalysis> {
+  context: {
+    methodName: string;
+    className: string;
+    args: any[];
+    [key: string]: any;
+  }
+) {
   if (!openai) {
-    throw new Error(
-      "SmartErrorLens: OpenAI configuration is missing. Please call configure() with your API key."
-    );
+    throw new Error('SmartErrorLens: OpenAI configuration is missing. Please call configure() with your API key.');
   }
 
   const stackTrace = error.stack || "";
@@ -106,8 +114,8 @@ async function analyzeError(
   `;
 
   try {
-    const response = await openai.createChatCompletion({
-      model: globalConfig.model || DEFAULT_MODEL,
+    const response = await openai.chat.completions.create({
+      model: globalConfig.model || "gpt-3.5-turbo",
       messages: [{ role: "user", content: prompt }],
     });
 
@@ -117,15 +125,24 @@ async function analyzeError(
         message: errorMessage,
         stack: stackTrace,
       },
-      analysis:
-        response.data.choices[0].message?.content || "No analysis available",
+      analysis: response.choices[0].message?.content || 'No analysis available',
       context: {
         method: `${context.className}.${context.methodName}`,
         arguments: context.args,
       },
     };
   } catch (aiError) {
-    console.error("Error while communicating with OpenAI API:", aiError);
-    throw aiError; // Rethrow the exception to avoid silent failure
+    return {
+      error: {
+        type: error.name,
+        message: errorMessage,
+        stack: stackTrace,
+      },
+      analysis: "Failed to get AI analysis",
+      context: {
+        method: `${context.className}.${context.methodName}`,
+        arguments: context.args,
+      },
+    };
   }
 }

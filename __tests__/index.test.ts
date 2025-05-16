@@ -1,3 +1,4 @@
+import 'openai/shims/node';
 import { SmartError, configure } from "../src";
 
 describe("SmartErrorLens", () => {
