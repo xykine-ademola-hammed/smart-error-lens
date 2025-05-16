@@ -1,4 +1,4 @@
-// Move all interfaces to the top for better organization
+// src/index.ts
 import 'openai/shims/node'; 
 import OpenAI from "openai";
 import "reflect-metadata";
@@ -13,12 +13,6 @@ export interface SmartErrorConfig {
   customPrompt?: string;
   mockMode?: boolean;
 }
-
-let globalConfig: SmartErrorConfig = {
-  model: "gpt-3.5-turbo",
-  collectStackTrace: true,
-  mockMode: false
-  };
 
 interface ErrorAnalysis {
   error: {
@@ -40,7 +34,7 @@ interface AnalysisContext {
   [key: string]: any;
 }
 
-// Add custom error types
+// Custom Error Types
 export class SmartErrorLensConfigError extends Error {
   constructor(message: string) {
     super(message);
@@ -55,9 +49,17 @@ export class SmartErrorLensAnalysisError extends Error {
   }
 }
 
+// Global Configuration
+let globalConfig: SmartErrorConfig = {
+  model: DEFAULT_MODEL,
+  collectStackTrace: true,
+  mockMode: false
+};
+
 // Initialize OpenAI
 let openai: OpenAI;
 
+// Configure the package
 export function configure(config: SmartErrorConfig) {
   try {
     globalConfig = { ...globalConfig, ...config };
@@ -83,53 +85,7 @@ export function configure(config: SmartErrorConfig) {
   }
 }
 
-
-async function analyzeError(error: Error, context: AnalysisContext): Promise<ErrorAnalysis> {
-  try {
-    const stackTrace = error.stack || "";
-    const errorMessage = error.message;
-
-    // Create base error info
-    const errorInfo: ErrorAnalysis = {
-      error: {
-        type: error.name,
-        message: errorMessage,
-        stack: stackTrace,
-      },
-      analysis: '',
-      context: {
-        method: `${context.className}.${context.methodName}`,
-        arguments: context.args,
-      },
-    };
-
-    // If in mock mode or no OpenAI instance, return mock analysis
-    if (globalConfig.mockMode || !openai) {
-      errorInfo.analysis = getMockAnalysis(error, context);
-      return errorInfo;
-    }
-
-    // OpenAI analysis
-    const response = await openai.chat.completions.create({
-      model: globalConfig.model || DEFAULT_MODEL,
-      messages: [{ 
-        role: "user", 
-        content: generatePrompt(error, context)
-      }],
-    });
-
-    errorInfo.analysis = response.choices[0].message?.content || 'No analysis available';
-    return errorInfo;
-
-  } catch (analyzeError) {
-    const errorMessage = analyzeError instanceof Error ? analyzeError.message : 'Unknown error';
-    throw new SmartErrorLensAnalysisError(
-      `Error analysis failed: ${errorMessage}`
-    );
-  }
-}
-
-// Separate prompt generation
+// Generate analysis prompt
 function generatePrompt(error: Error, context: AnalysisContext): string {
   return `
     As an AI debugging assistant, analyze this error:
@@ -147,8 +103,8 @@ function generatePrompt(error: Error, context: AnalysisContext): string {
   `;
 }
 
-// Add mock analysis function
-function getMockAnalysis(error: Error, context: any) {
+// Mock analysis generation
+function getMockAnalysis(error: Error, context: AnalysisContext): string {
   return `
     🔍 Mock Error Analysis:
     
@@ -184,4 +140,89 @@ function getMockAnalysis(error: Error, context: any) {
       throw new Error('Processing failed: ' + error.message);
     }
   `;
+}
+
+// Main decorator
+export function SmartError(options: SmartErrorConfig = {}) {
+  return function (
+    target: any,
+    propertyKey: string,
+    descriptor: PropertyDescriptor
+  ) {
+    const originalMethod = descriptor.value;
+
+    descriptor.value = async function (...args: any[]) {
+      try {
+        return await originalMethod.apply(this, args);
+      } catch (error) {
+        const errorInfo = await analyzeError(error as Error, {
+          methodName: propertyKey,
+          className: target.constructor.name,
+          args,
+          ...options,
+        });
+
+        console.group("🔍 SmartErrorLens Analysis");
+        console.error("❌ Error:", errorInfo.error);
+        console.info("📝 Analysis:", errorInfo.analysis);
+        console.info("📍 Context:", errorInfo.context);
+        console.groupEnd();
+
+        throw error;
+      }
+    };
+
+    return descriptor;
+  };
+}
+
+// Error analysis function
+async function analyzeError(error: Error, context: AnalysisContext): Promise<ErrorAnalysis> {
+  try {
+    const stackTrace = error.stack || "";
+    const errorMessage = error.message;
+
+    // Create base error info
+    const errorInfo: ErrorAnalysis = {
+      error: {
+        type: error.name,
+        message: errorMessage,
+        stack: stackTrace,
+      },
+      analysis: '',
+      context: {
+        method: `${context.className}.${context.methodName}`,
+        arguments: context.args,
+      },
+    };
+
+    // If in mock mode or no OpenAI instance, return mock analysis
+    if (globalConfig.mockMode || !openai) {
+      errorInfo.analysis = getMockAnalysis(error, context);
+      return errorInfo;
+    }
+
+    // OpenAI analysis
+    try {
+      const response = await openai.chat.completions.create({
+        model: globalConfig.model || DEFAULT_MODEL,
+        messages: [{ 
+          role: "user", 
+          content: generatePrompt(error, context)
+        }],
+      });
+
+      errorInfo.analysis = response.choices[0].message?.content || 'No analysis available';
+    } catch (aiError) {
+      console.warn('OpenAI analysis failed, falling back to mock analysis');
+      errorInfo.analysis = getMockAnalysis(error, context);
+    }
+
+    return errorInfo;
+
+  } catch (analyzeError) {
+    throw new SmartErrorLensAnalysisError(
+      `Error analysis failed: ${analyzeError instanceof Error ? analyzeError.message : 'Unknown error'}`
+    );
+  }
 }
