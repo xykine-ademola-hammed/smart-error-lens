@@ -22,6 +22,10 @@
   "author": "Your Name",
   "license": "MIT",
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.51.0",
+    "@google-ai/generativelanguage": "^3.2.0",
+    "@huggingface/inference": "^3.13.1",
+    "google-auth-library": "^10.0.0-rc.2",
     "openai": "^4.0.0",
     "reflect-metadata": "^0.1.13"
   },
@@ -42,6 +46,8 @@
     "testMatch": [
       "**/__tests__/**/*.test.ts"
     ],
-    "setupFiles": ["<rootDir>/jest.setup.js"]
+    "setupFiles": [
+      "<rootDir>/jest.setup.js"
+    ]
   }
 }

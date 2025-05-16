@@ -1,12 +1,13 @@
 // src/index.ts
-import 'openai/shims/node'; 
-import OpenAI from "openai";
+import 'openai/shims/node';
 import "reflect-metadata";
+import { providers, LLMProvider } from './providers';
 
-const DEFAULT_MODEL = "gpt-4.1-mini";
+const DEFAULT_MODEL = "gpt-3.5-turbo";
 
 // Interfaces
 export interface SmartErrorConfig {
+  provider?: 'mock' | 'openai' | 'huggingface' | 'palm' | 'anthropic';
   apiKey?: string;
   model?: string;
   collectStackTrace?: boolean;
@@ -51,36 +52,39 @@ export class SmartErrorLensAnalysisError extends Error {
 
 // Global Configuration
 let globalConfig: SmartErrorConfig = {
+  provider: 'mock',
   model: DEFAULT_MODEL,
   collectStackTrace: true,
   mockMode: false
 };
 
-// Initialize OpenAI
-let openai: OpenAI;
+// Initialize Provider
+let llmProvider: LLMProvider;
 
 // Configure the package
 export function configure(config: SmartErrorConfig) {
   try {
     globalConfig = { ...globalConfig, ...config };
-    
-    if (config.mockMode) {
+
+    if (config.mockMode || !config.apiKey) {
       console.log('SmartErrorLens: Running in mock mode');
-      return;
-    }
-    
-    if (!config.apiKey) {
-      console.warn('SmartErrorLens: No API key provided. Using mock mode.');
-      globalConfig.mockMode = true;
+      llmProvider = new providers.mock('');
       return;
     }
 
-    openai = new OpenAI({ apiKey: config.apiKey });
+    const providerName = config.provider || 'mock';
+    const Provider = providers[providerName];
+    
+    if (!Provider) {
+      throw new Error(`Provider ${providerName} not found`);
+    }
+
+    llmProvider = new Provider(config.apiKey);
   } catch (error) {
+    console.warn('Provider initialization failed, falling back to mock mode');
+    llmProvider = new providers.mock('');
     if (error instanceof Error) {
       throw new SmartErrorLensConfigError(`Configuration failed: ${error.message}`);
-    } else {
-      throw new SmartErrorLensConfigError('Configuration failed: Unknown error');
     }
   }
 }
@@ -100,45 +104,6 @@ function generatePrompt(error: Error, context: AnalysisContext): string {
     2. Potential solutions
     3. Best practices to prevent this error
     4. Code example for fix if possible
-  `;
-}
-
-// Mock analysis generation
-function getMockAnalysis(error: Error, context: AnalysisContext): string {
-  return `
-    🔍 Mock Error Analysis:
-    
-    Error Type: ${error.name}
-    Error Message: ${error.message}
-    Location: ${context.className}.${context.methodName}
-    
-    Root Cause Analysis:
-    - This appears to be a ${error.name} error
-    - The error occurred in the ${context.methodName} method
-    - Common cause: Invalid input or missing validation
-    
-    Potential Solutions:
-    1. Validate input parameters before processing
-    2. Add appropriate error checks
-    3. Implement proper error handling
-    
-    Best Practices:
-    - Always validate input data
-    - Use type checking when necessary
-    - Implement proper error boundaries
-    
-    Example Fix:
-    try {
-      // Validate input
-      if (!inputData) throw new Error('Input is required');
-      
-      // Process data
-      processData(inputData);
-    } catch (error) {
-      // Handle error appropriately
-      logger.error(error);
-      throw new Error('Processing failed: ' + error.message);
-    }
   `;
 }
 
@@ -196,26 +161,11 @@ async function analyzeError(error: Error, context: AnalysisContext): Promise<Err
       },
     };
 
-    // If in mock mode or no OpenAI instance, return mock analysis
-    if (globalConfig.mockMode || !openai) {
-      errorInfo.analysis = getMockAnalysis(error, context);
-      return errorInfo;
-    }
-
-    // OpenAI analysis
     try {
-      const response = await openai.chat.completions.create({
-        model: globalConfig.model || DEFAULT_MODEL,
-        messages: [{ 
-          role: "user", 
-          content: generatePrompt(error, context)
-        }],
-      });
-
-      errorInfo.analysis = response.choices[0].message?.content || 'No analysis available';
+      errorInfo.analysis = await llmProvider.analyze(generatePrompt(error, context));
     } catch (aiError) {
-      console.warn('OpenAI analysis failed, falling back to mock analysis ----', aiError);
-      errorInfo.analysis = getMockAnalysis(error, context);
+      console.warn('Analysis failed, falling back to mock provider');
+      errorInfo.analysis = await new providers.mock('').analyze(generatePrompt(error, context));
     }
 
     return errorInfo;
@@ -226,3 +176,5 @@ async function analyzeError(error: Error, context: AnalysisContext): Promise<Err
     );
   }
 }
+
+export { providers };
