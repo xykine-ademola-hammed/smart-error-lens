@@ -7,7 +7,7 @@ const DEFAULT_MODEL = "gpt-3.5-turbo";
 
 // Interfaces
 export interface SmartErrorConfig {
-  provider?: 'mock' | 'openai' | 'huggingface' | 'palm' | 'anthropic';
+  provider?: 'mock' | 'openai' | 'huggingface' | 'palm' | 'anthropic' | 'groq';
   apiKey?: string;
   model?: string;
   collectStackTrace?: boolean;
