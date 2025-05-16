@@ -3,7 +3,7 @@ import 'openai/shims/node';
 import OpenAI from "openai";
 import "reflect-metadata";
 
-const DEFAULT_MODEL = "gpt-3.5-turbo";
+const DEFAULT_MODEL = "gpt-4.1-mini";
 
 // Interfaces
 export interface SmartErrorConfig {
