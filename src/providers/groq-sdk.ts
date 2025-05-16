@@ -5,7 +5,7 @@ export class GroqProvider implements LLMProvider {
   private client: Groq;
   private model: string;
   
-  constructor(apiKey: string, model = 'mixtral-8x7b-32768') {
+  constructor(apiKey: string, model = 'mixtral-8x7b') {
     this.client = new Groq({
       apiKey: apiKey
     });
