@@ -5,12 +5,19 @@ import "reflect-metadata";
 
 const DEFAULT_MODEL = "gpt-3.5-turbo";
 
-interface SmartErrorConfig {
+export interface SmartErrorConfig {
   apiKey?: string;
   model?: string;
   collectStackTrace?: boolean;
   customPrompt?: string;
+  mockMode?: boolean;  // Add mock mode option
 }
+
+let globalConfig: SmartErrorConfig = {
+  model: "gpt-3.5-turbo",
+  collectStackTrace: true,
+  mockMode: false
+};
 
 
 interface ErrorAnalysis {
@@ -33,20 +40,64 @@ interface AnalysisContext {
   [key: string]: any;
 }
 
-let globalConfig: SmartErrorConfig = {
-  model: DEFAULT_MODEL,
-  collectStackTrace: true,
-};
-
 // Initialize OpenAI
 let openai: OpenAI;
 
 // Configure the package
 export function configure(config: SmartErrorConfig) {
   globalConfig = { ...globalConfig, ...config };
-  if (config.apiKey) {
-    openai = new OpenAI({ apiKey: config.apiKey });
+  
+  if (config.mockMode) {
+    console.log('SmartErrorLens: Running in mock mode');
+    return;
   }
+  
+  if (!config.apiKey) {
+    console.warn('SmartErrorLens: No API key provided. Using mock mode.');
+    globalConfig.mockMode = true;
+    return;
+  }
+
+  openai = new OpenAI({ apiKey: config.apiKey });
+}
+
+// Add mock analysis function
+function getMockAnalysis(error: Error, context: any) {
+  return `
+    🔍 Mock Error Analysis:
+    
+    Error Type: ${error.name}
+    Error Message: ${error.message}
+    Location: ${context.className}.${context.methodName}
+    
+    Root Cause Analysis:
+    - This appears to be a ${error.name} error
+    - The error occurred in the ${context.methodName} method
+    - Common cause: Invalid input or missing validation
+    
+    Potential Solutions:
+    1. Validate input parameters before processing
+    2. Add appropriate error checks
+    3. Implement proper error handling
+    
+    Best Practices:
+    - Always validate input data
+    - Use type checking when necessary
+    - Implement proper error boundaries
+    
+    Example Fix:
+    try {
+      // Validate input
+      if (!inputData) throw new Error('Input is required');
+      
+      // Process data
+      processData(inputData);
+    } catch (error) {
+      // Handle error appropriately
+      logger.error(error);
+      throw new Error('Processing failed: ' + error.message);
+    }
+  `;
 }
 
 export function SmartError(options: SmartErrorConfig = {}) {
@@ -91,12 +142,24 @@ async function analyzeError(
     [key: string]: any;
   }
 ) {
-  if (!openai) {
-    throw new Error('SmartErrorLens: OpenAI configuration is missing. Please call configure() with your API key.');
-  }
-
   const stackTrace = error.stack || "";
   const errorMessage = error.message;
+
+ // If in mock mode or no OpenAI instance, return mock analysis
+ if (globalConfig.mockMode || !openai) {
+  return {
+    error: {
+      type: error.name,
+      message: errorMessage,
+      stack: stackTrace,
+    },
+    analysis: getMockAnalysis(error, context),
+    context: {
+      method: `${context.className}.${context.methodName}`,
+      arguments: context.args,
+    },
+  };
+}
 
   const prompt = `
     As an AI debugging assistant, analyze this error:
