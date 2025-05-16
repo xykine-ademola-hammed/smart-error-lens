@@ -214,7 +214,7 @@ async function analyzeError(error: Error, context: AnalysisContext): Promise<Err
 
       errorInfo.analysis = response.choices[0].message?.content || 'No analysis available';
     } catch (aiError) {
-      console.warn('OpenAI analysis failed, falling back to mock analysis');
+      console.warn('OpenAI analysis failed, falling back to mock analysis ----', aiError);
       errorInfo.analysis = getMockAnalysis(error, context);
     }
 
