@@ -1,10 +1,8 @@
 import express from 'express';
 import { Server } from 'ws';
 import path from 'path';
-import { ErrorAnalysis, SmartError, configure } from './index';
+import { clients } from './broadcaster'; // Import from broadcaster.ts
 
-// Configure SmartErrorLens
-configure({ provider: 'mock', mockMode: true });
 
 const app = express();
 const port = 3040;
@@ -41,24 +39,11 @@ app.use(express.json());
 // WebSocket server for error logs
 const wss = new Server({ port: 3001 });
 
-// Store connected clients
-const clients = new Set();
-
 // Broadcast error logs to all connected clients
 wss.on('connection', (ws) => {
   clients.add(ws);
   ws.on('close', () => clients.delete(ws));
 });
-
-// Function to broadcast error analysis (called from SmartErrorLens)
-export function broadcastError(errorInfo: ErrorAnalysis) {
-  const message = JSON.stringify(errorInfo);
-  clients.forEach((client: any) => {
-    if (client.readyState === 1) { // WebSocket.OPEN
-      client.send(message);
-    }
-  });
-}
 
 
 app.listen(port, () => {

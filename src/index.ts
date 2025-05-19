@@ -2,7 +2,7 @@ import 'openai/shims/node';
 import "reflect-metadata";
 import { providers, LLMProvider } from './providers';
 import chalk from 'chalk';
-// import { broadcastError } from './server'; // Add import
+import { broadcastError } from './broadcaster'; // Import from broadcaster.ts
 
 const DEFAULT_MODEL = "gpt-3.5-turbo";
 
@@ -13,7 +13,6 @@ export interface SmartErrorConfig {
   collectStackTrace?: boolean;
   customPrompt?: string;
   mockMode?: boolean;
-  broadcaster?: (errorInfo: ErrorAnalysis) => void;
 }
 
 export interface ErrorAnalysis {
@@ -149,12 +148,7 @@ export function SmartError(options: SmartErrorConfig = {}) {
           console.info(errorInfo.context.sourceCode);
         }
         console.groupEnd();
-
-        // broadcastError(errorInfo)
-
-        if (globalConfig.broadcaster) {
-          globalConfig.broadcaster(errorInfo);
-        }
+        broadcastError(errorInfo);
         throw error;
       }
     };
@@ -201,5 +195,5 @@ module.exports = {
   SmartError,
   SmartErrorLensConfigError,
   SmartErrorLensAnalysisError,
-  providers,
+  providers
 };
