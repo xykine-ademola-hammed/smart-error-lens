@@ -2,7 +2,6 @@ import 'openai/shims/node';
 import "reflect-metadata";
 import { providers, LLMProvider } from './providers';
 import chalk from 'chalk';
-import { broadcastError } from './server'; // Import WebSocket broadcaster
 
 const DEFAULT_MODEL = "gpt-3.5-turbo";
 
@@ -13,6 +12,7 @@ export interface SmartErrorConfig {
   collectStackTrace?: boolean;
   customPrompt?: string;
   mockMode?: boolean;
+  broadcaster?: (errorInfo: ErrorAnalysis) => void;
 }
 
 export interface ErrorAnalysis {
@@ -161,8 +161,9 @@ export function SmartError(options: SmartErrorConfig = {}) {
         console.info(chalk.magenta('📊 Method Flow:'));
         console.info(methodFlowDiagram);
         console.groupEnd();
-        // Broadcast error to WebSocket clients
-        broadcastError(errorInfo);
+        if (globalConfig.broadcaster) {
+          globalConfig.broadcaster(errorInfo);
+        }
         throw error;
       }
     };
@@ -202,3 +203,13 @@ async function analyzeError(error: Error, context: AnalysisContext): Promise<Err
 }
 
 export { providers };
+
+// Export all symbols explicitly for CommonJS
+module.exports = {
+  configure,
+  SmartError,
+  // ErrorAnalysis is a type and cannot be exported as a value
+  SmartErrorLensConfigError,
+  SmartErrorLensAnalysisError,
+  providers
+};
