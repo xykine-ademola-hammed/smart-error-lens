@@ -2,7 +2,6 @@ import 'openai/shims/node';
 import "reflect-metadata";
 import { providers, LLMProvider } from './providers';
 import chalk from 'chalk';
-import { broadcastError } from './server';
 
 const DEFAULT_MODEL = "gpt-3.5-turbo";
 
@@ -212,6 +211,5 @@ module.exports = {
   // ErrorAnalysis is a type and cannot be exported as a value
   SmartErrorLensConfigError,
   SmartErrorLensAnalysisError,
-  providers,
-  broadcastError
+  providers
 };
