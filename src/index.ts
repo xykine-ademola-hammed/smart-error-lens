@@ -1,11 +1,11 @@
 import 'openai/shims/node';
 import "reflect-metadata";
 import { providers, LLMProvider } from './providers';
-import chalk from 'chalk'; // For colorful console output
+import chalk from 'chalk';
+import { broadcastError } from './server'; // Import WebSocket broadcaster
 
 const DEFAULT_MODEL = "gpt-3.5-turbo";
 
-// Interfaces
 export interface SmartErrorConfig {
   provider?: 'mock' | 'openai' | 'huggingface' | 'palm' | 'anthropic' | 'groq';
   apiKey?: string;
@@ -15,7 +15,7 @@ export interface SmartErrorConfig {
   mockMode?: boolean;
 }
 
-interface ErrorAnalysis {
+export interface ErrorAnalysis {
   error: {
     type: string;
     message: string;
@@ -37,7 +37,6 @@ interface AnalysisContext {
   [key: string]: any;
 }
 
-// Custom Error Types
 export class SmartErrorLensConfigError extends Error {
   constructor(message: string) {
     super(message);
@@ -52,7 +51,6 @@ export class SmartErrorLensAnalysisError extends Error {
   }
 }
 
-// Global Configuration
 let globalConfig: SmartErrorConfig = {
   provider: 'mock',
   model: DEFAULT_MODEL,
@@ -60,27 +58,21 @@ let globalConfig: SmartErrorConfig = {
   mockMode: false,
 };
 
-// Initialize Provider
 let llmProvider: LLMProvider;
 
-// Configure the package
 export function configure(config: SmartErrorConfig) {
   try {
     globalConfig = { ...globalConfig, ...config };
-
     if (config.mockMode || !config.apiKey) {
       console.log(chalk.yellow('⚠️ SmartErrorLens: Running in mock mode'));
       llmProvider = new providers.mock('');
       return;
     }
-
     const providerName = config.provider || 'mock';
     const Provider = providers[providerName];
-
     if (!Provider) {
       throw new Error(`Provider ${providerName} not found`);
     }
-
     llmProvider = new Provider(config.apiKey);
   } catch (error) {
     console.warn(chalk.red('❌ Provider initialization failed, falling back to mock mode'));
@@ -91,7 +83,6 @@ export function configure(config: SmartErrorConfig) {
   }
 }
 
-// Extract method source code
 function getMethodSource(target: any, propertyKey: string): string | undefined {
   try {
     const method = target[propertyKey];
@@ -101,7 +92,6 @@ function getMethodSource(target: any, propertyKey: string): string | undefined {
   }
 }
 
-// Generate analysis prompt with source code
 function generatePrompt(error: Error, context: AnalysisContext): string {
   const sourceCodeSection = context.sourceCode
     ? `
@@ -111,16 +101,13 @@ function generatePrompt(error: Error, context: AnalysisContext): string {
     \`\`\`
     `
     : 'Method Source Code: Not available';
-
   return `
     As an AI debugging assistant, analyze this error:
-
     Error Type: ${error.name}
     Error Message: ${error.message}
     Method: ${context.className}.${context.methodName}
     Stack Trace: ${error.stack || 'Not available'}
     ${sourceCodeSection}
-
     Please provide:
     1. Root cause analysis
     2. Potential solutions
@@ -129,7 +116,6 @@ function generatePrompt(error: Error, context: AnalysisContext): string {
   `;
 }
 
-// Method Flow Diagram
 const methodFlowDiagram = `
 graph TD
     A[Method Execution] -->|Throws Error| B[SmartError Decorator]
@@ -141,7 +127,6 @@ graph TD
     G --> H[Throw Original Error]
 `;
 
-// Main decorator
 export function SmartError(options: SmartErrorConfig = {}) {
   return function (
     target: any,
@@ -150,7 +135,6 @@ export function SmartError(options: SmartErrorConfig = {}) {
   ) {
     const originalMethod = descriptor.value;
     const sourceCode = getMethodSource(target, propertyKey);
-
     descriptor.value = async function (...args: any[]) {
       try {
         return await originalMethod.apply(this, args);
@@ -162,8 +146,6 @@ export function SmartError(options: SmartErrorConfig = {}) {
           sourceCode,
           ...options,
         });
-
-        // Beautiful console output
         console.group(chalk.cyan('🔍 SmartErrorLens Analysis'));
         console.error(chalk.red(`❌ Error: ${errorInfo.error.type}`));
         console.error(chalk.red(`   Message: ${errorInfo.error.message}`));
@@ -179,22 +161,19 @@ export function SmartError(options: SmartErrorConfig = {}) {
         console.info(chalk.magenta('📊 Method Flow:'));
         console.info(methodFlowDiagram);
         console.groupEnd();
-
+        // Broadcast error to WebSocket clients
+        broadcastError(errorInfo);
         throw error;
       }
     };
-
     return descriptor;
   };
 }
 
-// Error analysis function
 async function analyzeError(error: Error, context: AnalysisContext): Promise<ErrorAnalysis> {
   try {
     const stackTrace = globalConfig.collectStackTrace ? error.stack || '' : '';
     const errorMessage = error.message;
-
-    // Create base error info
     const errorInfo: ErrorAnalysis = {
       error: {
         type: error.name,
@@ -208,14 +187,12 @@ async function analyzeError(error: Error, context: AnalysisContext): Promise<Err
         sourceCode: context.sourceCode,
       },
     };
-
     try {
       errorInfo.analysis = await llmProvider.analyze(generatePrompt(error, context));
     } catch (aiError) {
       console.warn(chalk.yellow('⚠️ Analysis failed, falling back to mock provider'), aiError);
       errorInfo.analysis = await new providers.mock('').analyze(generatePrompt(error, context));
     }
-
     return errorInfo;
   } catch (analyzeError) {
     throw new SmartErrorLensAnalysisError(
