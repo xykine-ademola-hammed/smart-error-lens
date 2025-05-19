@@ -202,5 +202,4 @@ module.exports = {
   SmartErrorLensConfigError,
   SmartErrorLensAnalysisError,
   providers,
-  // broadcastError // Add to module.exports
 };
