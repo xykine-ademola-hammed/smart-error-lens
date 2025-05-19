@@ -38,34 +38,6 @@ app.use(express.static(path.join(__dirname, '..', 'public'), {
 // Parse JSON bodies
 app.use(express.json());
 
-// Store latest diagram (default from SmartErrorLens)
-let currentDiagram = `
-graph TD
-    A[Method Execution] -->|Throws Error| B[SmartError Decorator]
-    B --> C[Analyze Error]
-    C -->|Calls| D[LLM Provider]
-    D -->|Generates| E[Prompt with Source Code]
-    E --> F[AI Analysis]
-    F --> G[Formatted Output]
-    G --> H[Throw Original Error]
-`;
-
-// API to update diagram
-app.post('/api/diagram', (req, res) => {
-  const { diagram } = req.body;
-  if (typeof diagram === 'string' && diagram.trim()) {
-    currentDiagram = diagram;
-    res.json({ success: true });
-  } else {
-    res.status(400).json({ error: 'Invalid diagram text' });
-  }
-});
-
-// API to get current diagram
-app.get('/api/diagram', (req, res) => {
-  res.json({ diagram: currentDiagram });
-});
-
 // WebSocket server for error logs
 const wss = new Server({ port: 3001 });
 
@@ -88,24 +60,6 @@ export function broadcastError(errorInfo: ErrorAnalysis) {
   });
 }
 
-// Handle 404 errors with SmartErrorLens
-class ErrorHandler {
-  @SmartError()
-  static async handleNotFound(req: express.Request, res: express.Response) {
-    throw new Error(`Resource not found: ${req.originalUrl}`);
-  }
-}
-
-// // Catch-all route for 404s
-// app.all('*', async (req, res) => {
-//   try {
-//     await ErrorHandler.handleNotFound(req, res);
-//     res.status(404).send('Not Found');
-//   } catch (error) {
-//     // Error is already handled by SmartError decorator and broadcasted
-//     res.status(404).send('Not Found');
-//   }
-// });
 
 app.listen(port, () => {
   console.log(`Server running at http://localhost:${port}`);

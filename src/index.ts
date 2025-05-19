@@ -2,6 +2,7 @@ import 'openai/shims/node';
 import "reflect-metadata";
 import { providers, LLMProvider } from './providers';
 import chalk from 'chalk';
+import { broadcastError } from './server'; // Add import
 
 const DEFAULT_MODEL = "gpt-3.5-turbo";
 
@@ -116,17 +117,6 @@ function generatePrompt(error: Error, context: AnalysisContext): string {
   `;
 }
 
-const methodFlowDiagram = `
-graph TD
-    A[Method Execution] -->|Throws Error| B[SmartError Decorator]
-    B --> C[Analyze Error]
-    C -->|Calls| D[LLM Provider]
-    D -->|Generates| E[Prompt with Source Code]
-    E --> F[AI Analysis]
-    F --> G[Formatted Output]
-    G --> H[Throw Original Error]
-`;
-
 export function SmartError(options: SmartErrorConfig = {}) {
   return function (
     target: any,
@@ -158,8 +148,6 @@ export function SmartError(options: SmartErrorConfig = {}) {
           console.info(chalk.yellow('📜 Source Code:'));
           console.info(errorInfo.context.sourceCode);
         }
-        console.info(chalk.magenta('📊 Method Flow:'));
-        console.info(methodFlowDiagram);
         console.groupEnd();
         if (globalConfig.broadcaster) {
           globalConfig.broadcaster(errorInfo);
@@ -204,12 +192,12 @@ async function analyzeError(error: Error, context: AnalysisContext): Promise<Err
 
 export { providers };
 
-// Export all symbols explicitly for CommonJS
+// Export for CommonJS compatibility
 module.exports = {
   configure,
   SmartError,
-  // ErrorAnalysis is a type and cannot be exported as a value
   SmartErrorLensConfigError,
   SmartErrorLensAnalysisError,
-  providers
+  providers,
+  broadcastError // Add to module.exports
 };
