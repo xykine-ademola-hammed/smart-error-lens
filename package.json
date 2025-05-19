@@ -5,6 +5,7 @@
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "scripts": {
+    "start": "ts-node src/server.ts",
     "build": "tsc",
     "prepare": "npm run build",
     "test": "jest",
@@ -26,17 +27,21 @@
     "@google-ai/generativelanguage": "^3.2.0",
     "@huggingface/inference": "^3.13.1",
     "chalk": "^5.4.1",
+    "express": "^5.1.0",
     "google-auth-library": "^10.0.0-rc.2",
     "groq-sdk": "^0.22.0",
     "openai": "^4.0.0",
     "reflect-metadata": "^0.1.13"
   },
   "devDependencies": {
+    "@types/express": "^5.0.2",
     "@types/jest": "^27.0.3",
     "@types/node": "^16.11.12",
+    "@types/ws": "^8.18.1",
     "jest": "^27.4.5",
     "ts-jest": "^27.1.2",
-    "typescript": "^4.5.4"
+    "ts-node": "^10.9.2",
+    "typescript": "^4.9.5"
   },
   "repository": {
     "type": "git",
