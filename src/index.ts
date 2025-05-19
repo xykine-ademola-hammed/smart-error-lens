@@ -149,6 +149,9 @@ export function SmartError(options: SmartErrorConfig = {}) {
           console.info(errorInfo.context.sourceCode);
         }
         console.groupEnd();
+
+        broadcastError(errorInfo)
+
         if (globalConfig.broadcaster) {
           globalConfig.broadcaster(errorInfo);
         }
@@ -199,5 +202,5 @@ module.exports = {
   SmartErrorLensConfigError,
   SmartErrorLensAnalysisError,
   providers,
-  broadcastError // Add to module.exports
+  // broadcastError // Add to module.exports
 };

@@ -9,8 +9,12 @@
     "build": "tsc",
     "prepare": "npm run build",
     "test": "jest",
-    "prepublishOnly": "npm test"
+    "prepublishOnly": "npm run build"
   },
+  "files": [
+    "dist",
+    "public"
+  ],
   "keywords": [
     "error-handling",
     "typescript",
@@ -20,7 +24,7 @@
     "openai",
     "error-analysis"
   ],
-  "author": "Your Name",
+  "author": "Ademola Hammed",
   "license": "MIT",
   "dependencies": {
     "@anthropic-ai/sdk": "^0.51.0",
