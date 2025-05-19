@@ -2,7 +2,7 @@ import 'openai/shims/node';
 import "reflect-metadata";
 import { providers, LLMProvider } from './providers';
 import chalk from 'chalk';
-import { broadcastError } from './server'; // Add import
+// import { broadcastError } from './server'; // Add import
 
 const DEFAULT_MODEL = "gpt-3.5-turbo";
 
@@ -150,7 +150,7 @@ export function SmartError(options: SmartErrorConfig = {}) {
         }
         console.groupEnd();
 
-        broadcastError(errorInfo)
+        // broadcastError(errorInfo)
 
         if (globalConfig.broadcaster) {
           globalConfig.broadcaster(errorInfo);
