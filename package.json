@@ -11,10 +11,6 @@
     "test": "jest",
     "prepublishOnly": "npm run build"
   },
-  "files": [
-    "dist",
-    "public"
-  ],
   "keywords": [
     "error-handling",
     "typescript",
